@@ -16,6 +16,7 @@ require_relative "event_bus/middleware/transaction"
 require_relative "event_bus/middleware/validation"
 require_relative "event_bus/config_validator"
 require_relative "event_bus/config_lister"
+require_relative "event_bus/yaml_loader"
 require_relative "event_bus/railtie" if defined?(Rails::Railtie)
 
 # Background jobs (require ActiveJob)

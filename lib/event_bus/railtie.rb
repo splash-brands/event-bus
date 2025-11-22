@@ -44,6 +44,21 @@ module EventBus
       end
     end
 
+    # Load YAML handlers configuration
+    initializer "event_bus.load_yaml_handlers", after: :load_config_initializers do
+      Rails.application.config.to_prepare do
+        next if ENV["EVENTBUS_SKIP_YAML_LOAD"] == "true"
+
+        begin
+          EventBus::YamlLoader.load_all
+        rescue => e
+          Rails.logger.error("EventBus YAML loader failed: #{e.message}")
+          Rails.logger.error(e.backtrace&.first(5)&.join("\n"))
+          raise
+        end
+      end
+    end
+
     # Log EventBus initialization
     initializer "event_bus.log_initialization", after: :load_config_initializers do
       Rails.logger.info "EventBus-#{EventBus::VERSION} Initialized  event_types: #{EventBus.handlers.size}"

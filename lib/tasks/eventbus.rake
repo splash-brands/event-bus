@@ -233,6 +233,90 @@ namespace :eventbus do
     puts "  3. Configure event handlers in packs/#{pack_name}/config/initializers/"
   end
 
+  desc "Generate event_handlers.yml template for a pack"
+  task :generate_handlers, [:pack_name] => :environment do |_t, args|
+    pack_name = args[:pack_name]
+
+    if pack_name.nil? || pack_name.strip.empty?
+      puts "❌ Error: Pack name required"
+      puts "Usage: rake eventbus:generate_handlers[pack_name]"
+      puts "Example: rake eventbus:generate_handlers[orders]"
+      exit 1
+    end
+
+    path = Rails.root.join("packs", pack_name, "config", "event_handlers.yml")
+
+    if File.exist?(path)
+      puts "❌ Error: Configuration already exists at #{path}"
+      puts "Remove existing file first or edit it directly"
+      exit 1
+    end
+
+    template = <<~YAML
+      # Event handlers configuration for #{pack_name.camelize} pack
+      #
+      # This file defines all EventBus handlers for this pack in a declarative way.
+      # Handlers are automatically registered on Rails boot via EventBus::YamlLoader.
+      #
+      # Structure:
+      #   events:
+      #     event_name:
+      #       event_class: "Full::Class::Name"
+      #       description: "What this event represents"
+      #       handlers:
+      #         - name: "HandlerName"
+      #           class: "Full::Handler::ClassName"
+      #           priority: 1-10 (higher runs first)
+      #           async: true/false
+      #           error_strategy: log|raise|retry|ignore
+      #           description: "What this handler does"
+      #
+      # Priority Guidelines:
+      #   10: Critical immediate actions (notifications, alerts)
+      #   8:  Important but can tolerate slight delay (cache updates)
+      #   5:  Standard processing (audit logs, analytics)
+      #   3:  Low priority background tasks
+      #   1:  Best-effort, can fail silently
+      #
+      # Error Strategy Guide:
+      #   log: Log error and continue (most common)
+      #   raise: Fail fast, stop processing
+      #   retry: Queue for retry via ActiveJob (for external APIs)
+      #   ignore: Silent failure (rare, use carefully)
+
+      events:
+        # Example configuration:
+        # resource_created:
+        #   event_class: "#{pack_name.camelize}::Events::ResourceCreated"
+        #   description: "Published when a new resource is created"
+        #   handlers:
+        #     - name: "NotifyAdmins"
+        #       class: "#{pack_name.camelize}::EventHandlers::NotifyAdminsHandler"
+        #       priority: 10
+        #       async: false
+        #       error_strategy: log
+        #       description: "Send notifications to administrators"
+        #
+        #     - name: "UpdateCache"
+        #       class: "#{pack_name.camelize}::EventHandlers::UpdateCacheHandler"
+        #       priority: 8
+        #       async: false
+        #       error_strategy: log
+        #       description: "Refresh cached data"
+    YAML
+
+    FileUtils.mkdir_p(File.dirname(path))
+    File.write(path, template)
+
+    puts "✅ Created #{path}"
+    puts
+    puts "Next steps:"
+    puts "  1. Edit the file to add your event handlers"
+    puts "  2. Create handler classes in app/event_handlers/"
+    puts "  3. Handlers will auto-register on Rails boot"
+    puts "  4. Run: rake eventbus:handlers to verify registration"
+  end
+
   desc "Check EventBus configuration and status"
   task status: :environment do
     puts "EventBus Status"
