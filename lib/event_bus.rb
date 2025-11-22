@@ -17,6 +17,7 @@ require_relative "event_bus/middleware/validation"
 require_relative "event_bus/config_validator"
 require_relative "event_bus/config_lister"
 require_relative "event_bus/yaml_loader"
+require_relative "event_bus/instrumentation"
 require_relative "event_bus/railtie" if defined?(Rails::Railtie)
 
 # Background jobs (require ActiveJob)
@@ -307,7 +308,11 @@ module EventBus
         "eventbus.handler_error",
         handler: handler.class.name,
         event: event.class.name,
-        error: error.class.name,
+        error_class: error.class.name,
+        error_message: error.message,
+        exception: error, # Full exception object for error reporters
+        event_payload: event.to_h,
+        backtrace: error.backtrace&.first(10),
       )
     end
 
