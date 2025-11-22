@@ -1,0 +1,61 @@
+===============================================================================
+
+EventBus has been installed!
+
+The following file was created:
+  config/initializers/event_bus.rb
+
+This initializer contains:
+  • EventBus configuration (timeouts, instrumentation, logging)
+  • Middleware chain setup (logging, metrics, transaction tracking)
+  • Documentation and examples for event handlers
+
+Next steps:
+
+1. Review and customize the configuration in config/initializers/event_bus.rb
+
+2. Define your domain events:
+   # app/events/orders/order_paid.rb
+   class Orders::Events::OrderPaid
+     attr_reader :order_id, :amount
+
+     def initialize(order_id:, amount:)
+       @order_id = order_id
+       @amount = amount
+     end
+
+     def to_h
+       { order_id: order_id, amount: amount }
+     end
+
+     def partition_key
+       order_id
+     end
+   end
+
+3. Create event handlers:
+   # app/events/handlers/send_email_handler.rb
+   class SendEmailHandler
+     def call(event)
+       OrderMailer.confirmation(event.order_id).deliver_later
+     end
+   end
+
+4. Subscribe handlers in the initializer or pack-specific initializers:
+   EventBus.subscribe(
+     Orders::Events::OrderPaid,
+     SendEmailHandler.new,
+     priority: 8,
+     async: false,
+     error_strategy: :log
+   )
+
+5. Publish events in your application code:
+   # In your service/controller
+   EventBus.publish(Orders::Events::OrderPaid.new(order_id: 123, amount: 99.99))
+
+Documentation:
+  • GitHub: https://github.com/your-org/event_bus
+  • README: https://github.com/your-org/event_bus#readme
+
+===============================================================================
