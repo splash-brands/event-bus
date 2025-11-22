@@ -6,8 +6,9 @@ module EventBus
   # Checks for:
   # - Valid YAML syntax
   # - Required fields (persist_to_outbox, description)
+  # - Required 'reason' field for persisted events (persist_to_outbox: true)
   # - Correct data types (boolean for persist_to_outbox)
-  # - Non-empty descriptions
+  # - Non-empty descriptions and reasons
   #
   # @example
   #   validator = EventBus::ConfigValidator.new(Rails.root)
@@ -100,6 +101,20 @@ module EventBus
           errors << "Event '#{event_name}': 'description' must be a non-empty string"
         elsif event_config["description"].to_s.length < 20
           warnings << "Event '#{event_name}': has very short description (< 20 chars)"
+        end
+
+        # Reason field validation for persisted events
+        if event_config["persist_to_outbox"] == true
+          # Require reason field explaining WHY this event needs cross-process delivery
+          unless event_config.key?("reason")
+            errors << "Event '#{event_name}': missing 'reason' field (required when persist_to_outbox: true)"
+          end
+
+          if event_config["reason"].nil? || event_config["reason"].to_s.strip.empty?
+            errors << "Event '#{event_name}': 'reason' must be a non-empty string explaining why this event needs cross-process delivery"
+          elsif event_config["reason"].to_s.length < 30
+            warnings << "Event '#{event_name}': 'reason' is very short (< 30 chars). Consider explaining dependencies or external systems."
+          end
         end
 
         # OutboxRelay integration check (if available)
