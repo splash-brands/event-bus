@@ -131,12 +131,23 @@ module EventBus
         # Create handler instance
         handler = handler_class.new
 
+        # Determine async setting (YAML explicit value takes precedence over default)
+        async = if handler_config.key?(:async)
+          handler_config[:async]
+        else
+          EventBus.configuration.default_async
+        end
+
+        # Get async_priority from YAML (default to :normal if not specified)
+        async_priority = handler_config[:async_priority]&.to_sym || :normal
+
         # Register with EventBus
         EventBus.subscribe(
           event_class,
           handler,
           priority: handler_config[:priority] || 5,
-          async: handler_config[:async] || false,
+          async: async,
+          async_priority: async_priority,
           error_strategy: (handler_config[:error_strategy] || :log).to_sym,
         )
       end

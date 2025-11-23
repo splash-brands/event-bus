@@ -81,6 +81,7 @@ module EventBus
     # @param handler [#call] Handler object
     # @param priority [Integer] Execution priority (1-10, higher = earlier)
     # @param async [Boolean] Run handler asynchronously
+    # @param async_priority [Symbol] Async queue priority (:critical, :high, :normal, :low)
     # @param error_strategy [Symbol] How to handle errors (:log, :raise, :retry, :ignore)
     #
     # @example
@@ -89,13 +90,15 @@ module EventBus
     #     SendEmailHandler.new,
     #     priority: 8,
     #     async: false,
+    #     async_priority: :normal,
     #     error_strategy: :log
     #   )
-    def subscribe(event_class, handler, priority: 5, async: false, error_strategy: :log)
+    def subscribe(event_class, handler, priority: 5, async: false, async_priority: :normal, error_strategy: :log)
       registration = HandlerRegistration.new(
         handler,
         priority: priority,
         async: async,
+        async_priority: async_priority,
         error_strategy: error_strategy,
       )
 
@@ -106,11 +109,12 @@ module EventBus
     end
 
     # Subscribe to all events
-    def subscribe_all(handler, priority: 5, async: false, error_strategy: :log)
+    def subscribe_all(handler, priority: 5, async: false, async_priority: :normal, error_strategy: :log)
       registration = HandlerRegistration.new(
         handler,
         priority: priority,
         async: async,
+        async_priority: async_priority,
         error_strategy: error_strategy,
       )
 

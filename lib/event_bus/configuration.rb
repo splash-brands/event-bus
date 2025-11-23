@@ -17,7 +17,10 @@ module EventBus
                   :max_handler_time,
                   :enable_instrumentation,
                   :logger,
-                  :pack_namespace_mapping
+                  :pack_namespace_mapping,
+                  :default_async,
+                  :async_queue,
+                  :async_priorities
 
     def initialize
       @log_level = :debug
@@ -27,6 +30,16 @@ module EventBus
       @enable_instrumentation = true
       @logger = nil # Will use Rails.logger if available
       @pack_namespace_mapping = {}
+
+      # Async-first mode configuration
+      @default_async = false # Default to sync for backward compatibility
+      @async_queue = :eventbus_handlers # Default Sidekiq queue name
+      @async_priorities = {
+        critical: 10, # Email notifications, alerts
+        high: 8,      # Operator notifications
+        normal: 5,    # Cache updates, logging
+        low: 3,       # Analytics, reporting
+      }
     end
 
     # Get configured or default logger
