@@ -103,6 +103,15 @@ module EventBus
           warnings << "Event '#{event_name}': has very short description (< 20 chars)"
         end
 
+        # Version field validation (optional, but must be valid semver if present)
+        if event_config.key?("version")
+          if event_config["version"].nil? || event_config["version"].to_s.strip.empty?
+            errors << "Event '#{event_name}': 'version' must be a non-empty string"
+          elsif !valid_semver?(event_config["version"])
+            errors << "Event '#{event_name}': 'version' must be valid semantic version (e.g., '1.0.0', '2.1.3')"
+          end
+        end
+
         # Reason field validation for persisted events
         if event_config["persist_to_outbox"] == true
           # Require reason field explaining WHY this event needs cross-process delivery
@@ -139,6 +148,11 @@ module EventBus
 
     def extract_pack_name(file_path)
       file_path.split(File::SEPARATOR)[-3]
+    end
+
+    def valid_semver?(version)
+      # Semantic versioning format: MAJOR.MINOR.PATCH (e.g., 1.0.0, 2.3.1)
+      version.to_s.match?(/\A\d+\.\d+\.\d+\z/)
     end
   end
 end
