@@ -713,47 +713,102 @@ Get all handlers subscribed to event class (for introspection).
 
 ## Integration with OutboxRelay
 
-EventBus can be integrated with OutboxRelay (transactional outbox pattern) for reliable cross-process event delivery. The integration should be done at the application level (e.g., in Rails initializers), not within the EventBus gem itself.
+EventBus provides built-in middleware for integrating with OutboxRelay (transactional outbox pattern) for reliable cross-process event delivery.
 
-**Example integration in Rails:**
+### Architecture
+
+The integration uses the **Adapter Pattern** with **Dependency Injection**:
+
+- **EventBus::Middlewares::OutboxPersistence** - Main middleware (provided by gem)
+- **EventBus::Adapters::BaseAdapter** - Abstract interface for persistence backends
+- **EventBus::Adapters::OutboxRelayAdapter** - Concrete implementation for OutboxRelay gem
+- **EventBus::PackConfigLoader** - Loads `events.yml` configurations from packs
+
+### Setup
+
+**1. Create events.yml in each pack**
+
+Define which events should persist to outbox:
+
+```yaml
+# packs/orders/config/events.yml
+events:
+  order_paid:
+    persist_to_outbox: true
+    description: "Order payment events must be delivered to external systems"
+
+  order_validation_failed:
+    persist_to_outbox: false
+    description: "Internal validation errors, no cross-process delivery needed"
+```
+
+**2. Configure middleware in Rails initializer**
 
 ```ruby
 # config/initializers/event_bus.rb
-EventBus.use(OutboxPersistenceMiddleware.new)
 
-class OutboxPersistenceMiddleware
-  def call(event, next_middleware)
-    # Execute handlers synchronously
-    next_middleware.call(event)
+# Create adapter (wraps OutboxPublisher from OutboxRelay gem)
+adapter = EventBus::Adapters::OutboxRelayAdapter.new(OutboxPublisher)
 
-    # Persist to OutboxRelay for cross-process delivery
-    if should_persist?(event)
-      OutboxPublisher.publish(
-        topic: determine_topic(event),
-        payload: event.to_h,
-        headers: {
-          event_name: event.class.name.demodulize.underscore,
-          partition_key: event.partition_key
-        }
-      )
-    end
-  end
+# Create config loader (reads events.yml from all packs)
+config_loader = EventBus::PackConfigLoader.new(Rails.root)
 
-  private
-
-  def should_persist?(event)
-    # Your logic to determine which events should go to Kafka
-    # e.g., check pack configuration, event types, etc.
-  end
-
-  def determine_topic(event)
-    # Your logic to determine Kafka topic
-    # e.g., based on pack name or event namespace
-  end
-end
+# Register middleware with dependency injection
+EventBus.use(
+  EventBus::Middlewares::OutboxPersistence.new(
+    adapter: adapter,
+    config_loader: config_loader,
+    logger: Rails.logger
+  )
+)
 ```
 
-This keeps EventBus focused on in-process event dispatch while allowing flexible integration with outbox patterns at the application level.
+### Custom Adapters
+
+Implement custom adapters for other backends (Kafka, SQS, RabbitMQ):
+
+```ruby
+class MyKafkaAdapter < EventBus::Adapters::BaseAdapter
+  def initialize(kafka_producer)
+    @producer = kafka_producer
+  end
+
+  def publish(topic:, payload:, headers:)
+    @producer.produce(
+      payload.to_json,
+      topic: topic,
+      headers: headers
+    )
+  end
+end
+
+# Use custom adapter
+adapter = MyKafkaAdapter.new(Kafka.producer)
+EventBus.use(
+  EventBus::Middlewares::OutboxPersistence.new(
+    adapter: adapter,
+    config_loader: config_loader
+  )
+)
+```
+
+### How It Works
+
+1. **Event published** via `EventBus.publish(event)`
+2. **Middleware executes**:
+   - Runs all in-process handlers first (synchronous)
+   - Checks `events.yml` via `PackConfigLoader`
+   - If `persist_to_outbox: true`, calls adapter
+3. **Adapter persists** to backend (OutboxRelay, Kafka, etc.)
+4. **Background workers** asynchronously publish to message broker
+
+### Benefits
+
+- **Reusable** - Provided by gem, no code duplication
+- **Testable** - Mock adapters via dependency injection
+- **Flexible** - Supports multiple backends via adapter pattern
+- **Zero coupling** - EventBus doesn't know about OutboxRelay/Kafka specifics
+- **Safe** - Logs errors but doesn't fail request if outbox persistence fails
 
 ## Contributing
 
